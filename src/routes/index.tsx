@@ -2,11 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Home, Search, Library, ListMusic, Settings, Play, Pause, SkipBack, SkipForward,
-  Shuffle, Repeat, Repeat1, Volume2, VolumeX, Music2, X, Lock, Menu,
+  Shuffle, Repeat, Repeat1, Volume2, VolumeX, Music2, X, Lock, Menu, Sparkles, Loader2,
 } from "lucide-react";
 import { DEMO_TRACKS, driveStreamUrl, isAudioFile, makeTrack, type Track } from "@/lib/tracks";
 import { listDriveFolder } from "@/lib/drive.functions";
 import { cn } from "@/lib/utils";
+import { recommendQueue } from "@/lib/mood.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,6 +81,23 @@ function Player() {
 
   useEffect(() => { if (audio.current) audio.current.volume = muted ? 0 : volume; }, [volume, muted]);
 
+  const [queue, setQueue] = useState<number[]>([]);
+  const [mood, setMood] = useState("");
+  const [moodNote, setMoodNote] = useState("");
+  const [moodErr, setMoodErr] = useState("");
+  const [moodBusy, setMoodBusy] = useState(false);
+  const recommend = useServerFn(recommendQueue);
+  const buildQueue = async () => {
+    if (mood.trim().length < 2 || moodBusy) return;
+    setMoodBusy(true); setMoodErr(""); setMoodNote("");
+    try {
+      const r = await recommend({ data: { mood, titles: tracks.map((t) => t.title) } });
+      if ("error" in r) setMoodErr(r.error);
+      else { setQueue(r.indices); setMoodNote(r.note); playIndexForce(r.indices[0]!); }
+    } catch { setMoodErr("Couldn't build a queue. Please try again."); }
+    finally { setMoodBusy(false); }
+  };
+
   const track = current >= 0 ? tracks[current] : null;
 
   const playIndex = (i: number) => {
@@ -89,6 +108,12 @@ function Player() {
   const next = (auto = false) => {
     if (!tracks.length) return;
     if (auto && repeat === "one") { audio.current!.currentTime = 0; audio.current!.play(); return; }
+    if (queue.length) {
+      const pos = queue.indexOf(current);
+      let q = pos + 1;
+      if (q >= queue.length) { if (auto && repeat === "off") { setPlaying(false); return; } q = 0; }
+      playIndexForce(queue[q]!); return;
+    }
     let i = shuffle ? Math.floor(Math.random() * tracks.length) : current + 1;
     if (i >= tracks.length) { if (auto && repeat === "off") { setPlaying(false); return; } i = 0; }
     setCurrent(-2); playIndexForce(i);
@@ -188,6 +213,29 @@ function Player() {
             {view === "home" && (
               <>
                 <h1 className="mb-6 mt-4 text-3xl font-extrabold">Good to see you</h1>
+                <section className="mb-8 rounded-lg bg-card/70 p-5">
+                  <h2 className="flex items-center gap-2 text-lg font-bold"><Sparkles className="h-5 w-5 text-primary" /> Mood queue</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Describe a mood or activity and AI picks songs for you.</p>
+                  <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); void buildQueue(); }}>
+                    <input value={mood} onChange={(e) => setMood(e.target.value)} maxLength={300}
+                      placeholder="e.g. late-night coding, rainy Sunday, gym warm-up"
+                      className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm outline-none ring-ring focus:ring-2" />
+                    <button disabled={moodBusy || mood.trim().length < 2}
+                      className="flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50">
+                      {moodBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {moodBusy ? "Picking…" : "Build queue"}
+                    </button>
+                  </form>
+                  {moodErr && <p className="mt-3 text-sm text-destructive">{moodErr}</p>}
+                  {queue.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">{moodNote}</p>
+                        <button onClick={() => { setQueue([]); setMoodNote(""); }} className="text-xs text-muted-foreground hover:text-foreground">Clear queue</button>
+                      </div>
+                      <div className="mt-2">{queue.map((i, n) => tracks[i] && <Row key={i} t={tracks[i]} i={i} n={n + 1} />)}</div>
+                    </div>
+                  )}
+                </section>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                   {tracks.slice(0, 12).map((t, i) => (
                     <button key={t.id} onClick={() => playIndex(i)} className="group rounded-lg bg-card/60 p-3 text-left transition-colors hover:bg-accent">
