@@ -84,7 +84,7 @@ function Player() {
   const playIndex = (i: number) => {
     const a = audio.current; if (!a) return;
     if (i === current) { a.paused ? a.play() : a.pause(); return; }
-    setCurrent(i); a.src = tracks[i].src; a.play().catch(() => {});
+    setCurrent(i); a.src = tracks[i]?.src ?? ""; a.play().catch(() => {});
   };
   const next = (auto = false) => {
     if (!tracks.length) return;
@@ -94,7 +94,7 @@ function Player() {
     setCurrent(-2); playIndexForce(i);
   };
   const playIndexForce = (i: number) => {
-    const a = audio.current!; setCurrent(i); a.src = tracks[i].src; a.play().catch(() => {});
+    const a = audio.current!; setCurrent(i); a.src = tracks[i]?.src ?? ""; a.play().catch(() => {});
   };
   const prev = () => {
     const a = audio.current!;
@@ -285,7 +285,7 @@ const ME = () => "ME";
 
 function extractId(v: string) {
   const m = v.match(/folders\/([\w-]+)/) ?? v.match(/[?&]id=([\w-]+)/);
-  return (m ? m[1] : v).trim();
+  return (m?.[1] ?? v).trim();
 }
 
 function SettingsModal({ initial, onClose, onSave }: { initial: string; onClose: () => void; onSave: (id: string) => void }) {
