@@ -16,10 +16,10 @@ export const listDriveFolder = createServerFn({ method: "POST" })
     const re = /id="entry-([\w-]+)"[\s\S]*?class="flip-entry-title">([^<]+)</g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(html))) {
-      const name = m[2]
+      const name = (m[2] ?? "")
         .replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"')
         .replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
-      files.push({ id: m[1], name });
+      files.push({ id: m[1] ?? "", name });
     }
     return files;
   });
